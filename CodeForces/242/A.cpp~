@@ -1,0 +1,54 @@
+#include <cstdio>
+
+int main () {
+
+    int numHamsters;
+    int standing = 0;
+    int needToStand = 0;
+    char hamsters[205];
+    
+    scanf ("%d", &numHamsters);
+    
+    for (int i = 0; i < numHamsters + 1; i++) {
+        scanf ("%c", &hamsters[i]);
+        if (hamsters[i] == 'X') {
+            standing++;
+        }
+    }
+    
+    needToStand = (numHamsters / 2) - standing;
+    
+    int i = 1;
+    int j = 0;
+    if (needToStand > 0) {
+        while (j <= needToStand) {
+            if (hamsters[i] == 'x') {
+                hamsters[i] = 'X';
+                i++;
+            }
+            j++;
+        }
+    } else if (needToStand < 0) {
+        while (j <= needToStand * -1) {
+            if (hamsters[i] == 'X') {
+                hamsters[i] = 'x';
+                i++;
+            }
+            j++;
+        }
+    }
+    
+    if (needToStand < 0) {
+        printf ("%d\n", needToStand * -1);
+    } else {
+        printf ("%d\n", needToStand);
+    }
+    
+    for (int i = 1; i < numHamsters + 1; i++) {
+        printf ("%c", hamsters[i]);
+    }
+    
+    printf ("\n");
+    
+    return 0;
+}
