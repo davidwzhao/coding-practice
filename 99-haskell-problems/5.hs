@@ -16,5 +16,6 @@ myReverse' :: [a] -> [a]
 myReverse' [] = []
 myReverse' xs = last xs : (myReverse' $ init xs)
 
+-- solution!
 myReverse''' :: [a] -> [a]
 myReverse''' = foldl (\a x -> x:a) []
