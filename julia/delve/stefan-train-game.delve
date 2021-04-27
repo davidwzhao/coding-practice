@@ -1,0 +1,187 @@
+
+res = query(conn, """
+def state = pivot[input_state]
+def n_sample = count[input_state]
+def n_numbers = count[state]
+
+ic ic_sample { n_sample = 1}
+ic ic_cardinality { n_numbers > 1}
+ic ic_arity {arity[state] = 2}
+ic ic_list { function(state) }
+
+@inline 
+def divide_safe[a,b](c) = divide(a,b,c) and b!=0
+
+// operators
+// ----------
+@inline
+def operator[:symbol] = {
+    (1, "+"); (2, "-"); (3, "*"); (4, "/");
+}
+
+@inline 
+def operator[:action] = {
+    (1, add);
+    (2, subtract);
+    (3, multiply);
+    (4, divide_safe);
+}
+
+def n_operator = count[first[operator[:symbol]]]
+
+
+// -------------------
+// execution plans
+// -------------------
+//def plan[1, 1] = (:position, 2); (:operator, 1)
+//def plan[1, 2] = (:position, 3); (:operator, 2)
+//def plan[1, 3] = (:position, 1); (:operator, 3)
+
+
+// get all execution order combinations
+// -> each iteration step create all (n_numbers-step)-cycle permutation
+// base case: step 0
+def N = n_numbers - 1
+def combi_position[0, 0] = i for i in range[1, N, 1]
+
+// recursive rule
+def combi_position(step, id, pos1, pos2) =
+        combi_position(step_prev, id_prev, pos1_prev, pos2)
+    and n_numbers > step = step_prev + offset_step
+    and offset_step = range[1, N-1, 1] 
+    and offset_pos1 = range[1, N-step, 1]
+    and id = Max[i: combi_position(step-1, i, _, _)] + id_prev * (N-step) + offset_pos1
+    and (
+        (    
+            pos1_prev < step
+        and pos1 = pos1_prev
+        ) or (
+            pos1_prev >= step
+        and pos1 = (pos1_prev + offset_pos1 - step) % (N-step+1) + step
+        )
+    )
+    from offset_step, offset_pos1, step_prev, id_prev, pos1_prev
+
+def combination_position = combi_position[_]
+
+ic unique(id) { function(combination_position[id]) }
+ic find_all { count[combination_position] = factorial[N] * N}
+
+// -----------
+// get all operator combinations
+@inline
+def combination_operator[id, pos] = 
+    ((id-1) % (n_operator^pos)) ÷ (n_operator^(pos-1)) + 1
+
+// all execution plans
+def plan(id, order, attribute, value) = 
+        id = id_position * n_operator^n_numbers + id_operator
+    and id_operator = range[1, n_operator^n_numbers, 1]
+    and operator = combination_operator[id_operator, order]
+    and position = combination_position[id_position, order]
+    and {
+        (:position, position);
+        (:operator, operator)
+    }(attribute, value)
+    from 
+        id_position, id_operator, operator, position
+
+
+def plan[i, order, :offset] = count[o: 
+        plan[i, o, :position] < plan[i, order, :position] 
+    and o < order 
+]
+
+
+// evaluation
+// ----------
+@inline
+def eval_simple[op, a, b] = operator[:action, op][a, b]
+
+def evaluate(plan_id, order, pos, value) = 
+    state(pos, value) and 
+    order=0 and 
+    first[plan](plan_id)
+
+def evaluate(plan_id, order, pos, value) = 
+    ∃(op_id, pos_a, pos_b, pos_prev, value_prev : 
+        evaluate(plan_id, order-1, pos_prev, value_prev)
+    and op_id = plan[plan_id, order, :operator]
+    and pos_a = plan[plan_id, order, :position] - (plan[plan_id, order, :offset] <++ 0)
+    and pos_b = pos_a + 1
+    and (∃(a, b :
+            pos_a = pos_prev = pos and 
+            value = eval_simple[op_id, a, b] and
+            evaluate(plan_id, order-1, pos_a, a) and
+            evaluate(plan_id, order-1, pos_b, b)
+        ) or (
+            pos_prev < pos_a and pos = pos_prev and 
+            value = value_prev
+        ) or (
+            pos_prev > pos_b and pos = pos_prev - 1 and 
+            value = value_prev
+        ))
+    )
+
+@inline
+def eval_formula[id](value) = evaluate(id, n_numbers-1, 1, value)
+
+
+// string representation
+// ---------------------
+@inline
+def print_expression_simple[op, a,b] = 
+    concat[concat["(", concat[concat[a, op], b]], ")"]
+
+def print_expression(plan_id, 0, pos, value) = 
+    value = state[pos].string and 
+    first[plan](plan_id)
+
+def print_expression(plan_id, order, pos, value) = 
+    ∃(op_id, pos_a, pos_b, pos_prev, value_prev : 
+        print_expression(plan_id, order-1, pos_prev, value_prev)
+    and op_id = plan[plan_id, order, :operator]
+    and pos_a = plan[plan_id, order, :position] - (plan[plan_id, order, :offset] <++ 0)
+    and pos_b = pos_a + 1
+    and (∃(a, b :
+            pos_a = pos_prev = pos and 
+            value = print_expression_simple[op_id.(operator[:symbol]), a, b] and
+            print_expression(plan_id, order-1, pos_a, a) and
+            print_expression(plan_id, order-1, pos_b, b)
+        ) or (
+            pos_prev < pos_a and pos = pos_prev and 
+            value = value_prev
+        ) or (
+            pos_prev > pos_b and pos = pos_prev - 1 and 
+            value = value_prev
+        ))
+    )
+
+def print_formula[id] = print_expression[id, n_numbers-1, 1]
+
+
+// query some statements
+// ---------------------
+def out["min"] = eval_formula[i], print_formula[i] 
+    from i in ArgMin[eval_formula]
+
+def out["max"] = eval_formula[i], print_formula[i] 
+    from i in ArgMax[eval_formula]
+
+def out["most"] = eval_formula[i], print_formula[i] 
+    from i 
+    where eval_formula[i] = ArgMax[v: count[ii: eval_formula(ii, v)]]
+
+def out["exist"] = eval_formula[i], print_formula[i] 
+    from i
+    where eval_formula[i] = result
+
+// calculate counts for each result
+def output = count[out[mode]] for mode
+"""; 
+    inputs = Dict(
+        :input_state => (5.0, 3.0, 2.0, 4.0, 2.0),
+        :result => 24.0,
+    ),
+    outputs = [:out]
+)

@@ -1,0 +1,86 @@
+/*
+module Example8
+    // A retailer feature set.
+    def oil_price[date] = (...)
+    def last_week_sales[date, item] = (...)
+    def last_month_sales[date, item] = (...)
+end
+*/
+
+def Example8[:oil_price] = {(2020-06-21, 26); (2020-06-22, 28); (2020-06-23, 21)}
+def Example8[:last_week_sales] = {(2021-06-21, "item1", 21); (2021-06-21, "item2", 1322); (2021-06-28, "item1", 21); (2021-06-28, "item2", 1345)}
+def Example8[:last_month_sales] = {(2021-06-30, "item1", 143); (2021-06-30, "item2", 7423); (2021-07-31, "item1", 174); (2021-07-31, "item2", 8213)}
+
+// def R[:column_1] = {(12, 32); (12, 35)}
+// def R[:column_2] = {(12, 3.27); (15, 72.2)}
+// def R[:column_3] = {(12, "b"); (12, "a"); (15, "c")}
+
+// def R = (12, :column_1, 32); (13, :column_1, 35);
+// /* def R = */ (12, :column_2, 3.27); (15, :column_2, 72.2);
+// /* def R = */ (12, :column_3, "b"); (18, :column_3, "a"); (19, :column_3, "c")
+
+def R = {
+(29, :date, 2020-01-01);
+(60, :date, 2020-02-02);
+(91, :date, 2020-03-03);
+(127, :date, 2020-04-04);
+(29, :price, 12.5);
+(60, :price, 14.25);
+(91, :price, 11.0);
+(127, :price, 12.25);
+// (29, :quantity, 2);
+// (60, :quantity, 4);
+// (91, :quantity, 4);
+// (127, :quantity, 3);
+(29, :cocktail, "martini");
+(60, :cocktail, "sazerac");
+(91, :cocktail, "cosmopolitan");
+(127, :cocktail, "bellini");
+}
+
+@inline
+def freq[R, elem] = count[x..., y: R(x..., y) and y = elem]
+
+@inline
+def mode[R] = last[top[1, ArgMax[freq[R]]]]
+
+@inline
+def percentile_1[R, p] = value :
+    // index is a float value, we multiply by count[R] - 1 first rather than divide by
+    // 100.0 first to avoid imprecision
+    index = (p * (count[R] - 1.0)) / 100.0 + 1.0 and
+
+    // compute the lower and upper bounds surrounding the value for the p-th percentile
+    value = sum[i, s:
+        // the value at index i contributes (1 - abs[i - index]) proportion of the final
+        // percentile
+        s = v * (1 - abs[i - index]) and
+
+        // sort[y, x...] instead of sort[last[R]] to handle duplicate values
+        sort[y, x...: R(x..., y)](i, v, rest...) and
+
+        // only for the values surrounding index
+        index - 1.0 <= 1.0 * i <= index + 1.0
+        from v, rest...
+    ]
+    from index
+
+// Stats for all types
+@inline def describe_1_full[R, :count] = count[R]
+@inline def describe_1_full[R, :min] = Min[R]
+@inline def describe_1_full[R, :max] = Max[R]
+
+// Stats for non-numeric types
+@inline def describe_1_full[R, :unique] = count[last[R :> (x: not Number(x))]]
+@inline def describe_1_full[R, :mode] = mode[R :> (x: not Number(x))]
+@inline def describe_1_full[R, :mode_freq] = Max[frequency[R :> (x: not Number(x))]]
+
+// Stats for numeric types
+@inline def describe_1_full[R, :mean] = mean[R :> Number]
+@inline def describe_1_full[R, :std] = sample_stddev[R :> Number]
+@inline def describe_1_full[R, :percentile25] = percentile[(R :> Number), 25]
+@inline def describe_1_full[R, :percentile50] = percentile[(R :> Number), 50]
+@inline def describe_1_full[R, :percentile75] = percentile[(R :> Number), 75]
+
+@inline
+def describe_1[R] = column: describe_1_full[keys..., value: R(keys..., column, value)]

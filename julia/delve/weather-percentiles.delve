@@ -1,0 +1,4 @@
+def config[:path] = "/home/david/tmp/sydney-weather-data.csv"
+def config[:schema, :MaxTemp] = "float"
+
+def weather_data = load_csv[config]

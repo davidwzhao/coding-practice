@@ -1,0 +1,121 @@
+// def R = {(1, 12.24); (1, 123.5); (2, 23); (2, 2); (12, 74); (12, 22)}
+// def R = {1; 2; 3; 4}
+
+/*
+def R = {
+    (1, 2);
+    (1, 4);
+    (1, 6);
+    (4, 8);
+    (4, 13);
+    (4, 16);
+    (4, 22);
+    (4, 35);
+    (4, 40);
+    (10, 42);
+    (10, 48)
+    }
+    */
+
+def R = {(1, 26); (2, 26); (3, 28); (1, 36); (2, 13)}
+
+def R_top[index] = top[1, R[index]]
+
+/*
+@inline
+def percentile[R, p] = (sort[last[R]][i] for i where i = float_int_convert[ceil[(p / 100.0) * count[R]]])[_]
+*/
+
+/*
+@inline
+def percentile_continuous[R, p] = res: exists(lower, upper, diff, index: 
+    res = lower + ((upper - lower) * diff) and 
+    index = (p / 100.0) * (count[R] + 1) and
+    1.0 <= index <= int_float_convert[count[R]] and
+    lower = val: (sort[x, x...: R(x..., x)][i] for i where i = float_int_convert[floor[index]])(_, val, _...) and
+    upper = val: (sort[x, x...: R(x..., x)][i] for i where i = float_int_convert[ceil[index]])(_, val, _...) and
+    // upper = val: (sort[last[R]][j] for j where j = float_int_convert[ceil[index]])[_] and
+
+    // how to truncate the int part of a float?
+    diff = index - floor[index]
+    )
+
+@inline
+def percentile_continuous[R, p] = res: exists(index:
+    index = (p / 100.0) * (count[R] + 1) and
+    index < 1.0 and
+    res = (sort[last[R]][i] for i where i = 1)[_]
+    )
+
+@inline
+def percentile_continuous[R, p] = res: exists(index:
+    index = (p / 100.0) * (count[R] + 1) and
+    index > int_float_convert[count[R]] and
+    res = (sort[last[R]][i] for i where i = count[R])[_]
+    )
+
+@inline
+def percentile_continuous_1[R, p] = res: exists(lower, upper, diff, index:
+    // res is the weighted average
+    res = lower + ((upper - lower) * diff) and
+
+    // index is a float value
+    index = ((p / 100.0) * (count[R] - 1) + 1) and
+
+    // compute the lower and upper bounds surrounding the value for the p-th percentile
+    // lower = (sort[last[R]][i] for i where i = float_int_convert[floor[index]])[_] and
+    // upper = (sort[last[R]][j] for j where j = float_int_convert[ceil[index]])[_] and
+
+    lower = first[(sort[x, x...: R(x..., x)][i] for i where i = float_int_convert[floor[index]])[_]] and
+    upper = first[(sort[x, x...: R(x..., x)][i] for i where i = float_int_convert[ceil[index]])[_]] and
+
+    // diff is the weight factor for the weighted average
+    diff = index - floor[index]
+    )
+    */
+
+@inline
+def percentile_1[R, p] = value :
+    // index is a float value, we multiply by count[R] - 1 first rather than divide by
+    // 100.0 first to avoid imprecision
+    index = (p * (count[R] - 1.0)) / 100.0 + 1.0 and
+
+    // compute the lower and upper bounds surrounding the value for the p-th percentile
+    value = sum[i, s:
+        // the value at index i contributes (1 - abs[i - index]) proportion of the final
+        // percentile
+        s = v * (1.0 - abs[i - index]) and
+
+        // sort[y, x...] instead of sort[last[R]] to handle duplicate values
+        sort[y, x...: R(x..., y)](i, v, rest...) and
+
+        // only for the values surrounding index
+        index - 1.0 <= 1.0 * i <= index + 1.0
+        from v, rest...
+    ]
+    from index
+
+@inline
+def sum_nearest[R, index] =
+    sum[i, s:
+        // the value at index i contributes (1 - abs[i - index]) proportion of the final
+        // percentile
+        s = v * (1.0 - abs[i - index]) and
+
+        // sort[y, x...] instead of sort[last[R]] to handle duplicate values
+        sort[y, x...: R(x..., y)](i, v, rest...) and
+
+        // only for the values surrounding index
+        index - 1.0 <= 1.0 * i <= index + 1.0
+        from v, rest...
+    ]
+
+@inline
+def index_1[R, p] =
+    // index is a float value
+    (p * (count[R] - 1.0) / 100.0 + 1.0)
+    
+
+
+def R_quarter = percentile[R, 25]
+

@@ -1,0 +1,20 @@
+/*
+def person[:age] = {
+    (1, 37);
+    (2, 31);
+    (3, 47);
+    (4, 27);
+    (5, 12);
+}
+ic value_violation(id, age) {
+    person[:age](id, age)
+    implies
+    age >= 18
+}
+*/
+
+def p = 3; 4; 5
+def q = 6; 7; 8
+def r = p(x) and q(x)
+
+ic { forall(x: r(x): String(x)) }
